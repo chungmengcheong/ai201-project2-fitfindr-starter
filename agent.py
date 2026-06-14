@@ -18,7 +18,31 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
-from tools import search_listings, suggest_outfit, create_fit_card
+import json
+
+from tools import search_listings, suggest_outfit, create_fit_card, _get_groq_client
+
+
+# ── query parser ─────────────────────────────────────────────────────────────
+
+def _parse_query(query: str) -> dict:
+    """Use the LLM to extract description, size, and max_price from a natural language query."""
+    client = _get_groq_client()
+    prompt = (
+        f"Extract the description keywords, size, and max price from this query: \"{query}\"\n"
+        "Return a JSON object with exactly these fields: description (str), size (str or null), max_price (float or null).\n"
+        "Examples:\n"
+        '"vintage graphic tee under $30" → {"description": "vintage graphic tee", "size": null, "max_price": 30}\n'
+        '"black combat boots size 8" → {"description": "black combat boots", "size": "8", "max_price": null}\n'
+        '"designer ballgown size XXS under $5" → {"description": "designer ballgown", "size": "XXS", "max_price": 5}\n'
+        "Return only the JSON object, nothing else."
+    )
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    return json.loads(response.choices[0].message.content)
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -92,9 +116,39 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 2: parse query
+    session["parsed"] = _parse_query(query)
+    parsed = session["parsed"]
+
+    # Step 3: search listings
+    session["search_results"] = search_listings(
+        parsed["description"],
+        size=parsed.get("size"),
+        max_price=parsed.get("max_price"),
+    )
+    if not session["search_results"]:
+        session["error"] = "No listings found matching your search. Try a different description, size, or price."
+        return session
+
+    # Step 4: select top result
+    session["selected_item"] = session["search_results"][0]
+
+    # Step 5: suggest outfit
+    outfit = suggest_outfit(session["selected_item"], session["wardrobe"])
+    if outfit.startswith("Error message:"):
+        session["error"] = outfit
+        return session
+    session["outfit_suggestion"] = outfit
+
+    # Step 6: create fit card
+    fit_card = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+    if fit_card.startswith("Error message:"):
+        session["error"] = fit_card
+        return session
+    session["fit_card"] = fit_card
+
     return session
 
 
