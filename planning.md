@@ -654,11 +654,11 @@ I was not familiar with Pytest, so I used Claude to help me create test cases fo
 
 - *What it produced:* 
 
-It a set of tests cases. I read through it, and asking Claude to explain sections, to help me understand how it works. 
+It produced a set of tests cases, which was helpful in guiding me in learning how pytest works and how to mock up responses. 
 
 - *What I changed or overrode:* 
 
-I experimented with the test parameters to help me undestand pytest and the generated code. In the future, I think I would write the test cases first before implmentation. 
+I experimented with the test parameters to help me undestand pytest and the generated code. I prompted Claude to add specific test cases, in particular for the happy path. 
 
 
 **Instance 2**
@@ -677,18 +677,22 @@ It implemented searchi_listing in one-shot. It also ran through some basic verif
 
 - *What I changed or overrode:* 
 
-I inspected the code and accepted it as produced. The detailed spec got it to where I wanted in one-shot. 
+I inspected the code and accepted it as produced. The detailed spec got the produced code to where I had wanted without significant rework.  
 
 ## Spec reflection
 
 ### How spec helped
 
-I found the spec helpful in (forcing!) thinking through the user flow and how to handle the different states and inputs (e.g., happy path, no wardrobe, etc). 
+I found the spec helpful in (forcing!) thinking through and articulating the user flow and how to handle the different states and inputs (e.g., happy path, no wardrobe, etc). 
 
-However, I think the degree of detail in the documentation seems unnatural. I would imagine progressive discovery - we learn more as we work the problem, and some element of co-exploring with Claude. In forcing a detailed spec upfront, the discovery steps were missing. I felt this was a very waterfall approach to development. 
+However, I think the degree of detail in the documentation seems forced. I would imagine in the real world, there is some element of progressive discovery - we learn more as we work the problem, and co-exploring the problem and solution space with Claude. 
+
+By forcing a detailed spec upfront, the discovery steps were truncated, which resulted in a very waterfall and stitled approach to development. 
 
 
 ### How diverged
 
-I had to adjust how refine how error state was passed from the tool to and managed by the planning loop. The interface for the tools, as given, had different patterns for communicating errors and edge cases, e.g, the search_listing() returned null results as opposed to generating an error message. This required me to refactor code, planning.md, and architecture continously, which was a error-prone experience.  
+I had to adjust how refine how error state was passed from the tool to and managed by the planning loop. In particular, the interface for the tools, as given, had different patterns for communicating errors and edge cases, e.g, the search_listing() returned null results as opposed to generating an error message. This changed whether an error was trapped and handled by the agent loop or in the tool. 
+
+Additionally, this required me to refactor code, planning.md, and architecture continously, which was a significant overhead to maintain consistency between all the documents. 
 
