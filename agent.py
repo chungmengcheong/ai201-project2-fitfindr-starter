@@ -22,14 +22,14 @@ import json
 
 from tools import search_listings, suggest_outfit, create_fit_card, _get_groq_client
 
-
 # ── query parser ─────────────────────────────────────────────────────────────
+
 
 def _parse_query(query: str) -> dict:
     """Use the LLM to extract description, size, and max_price from a natural language query."""
     client = _get_groq_client()
     prompt = (
-        f"Extract the description keywords, size, and max price from this query: \"{query}\"\n"
+        f'Extract the description keywords, size, and max price from this query: "{query}"\n'
         "Return a JSON object with exactly these fields: description (str), size (str or null), max_price (float or null).\n"
         "Examples:\n"
         '"vintage graphic tee under $30" → {"description": "vintage graphic tee", "size": null, "max_price": 30}\n'
@@ -47,6 +47,7 @@ def _parse_query(query: str) -> dict:
 
 # ── session state ─────────────────────────────────────────────────────────────
 
+
 def _new_session(query: str, wardrobe: dict) -> dict:
     """
     Initialize and return a fresh session dict for one user interaction.
@@ -58,18 +59,19 @@ def _new_session(query: str, wardrobe: dict) -> dict:
     You may add fields to this dict as needed for your implementation.
     """
     return {
-        "query": query,              # original user query
-        "parsed": {},                # extracted description / size / max_price
-        "search_results": [],        # list of matching listing dicts
-        "selected_item": None,       # top result, passed into suggest_outfit
-        "wardrobe": wardrobe,        # user's wardrobe dict
-        "outfit_suggestion": None,   # string returned by suggest_outfit
-        "fit_card": None,            # string returned by create_fit_card
-        "error": None,               # set if the interaction ended early
+        "query": query,  # original user query
+        "parsed": {},  # extracted description / size / max_price
+        "search_results": [],  # list of matching listing dicts
+        "selected_item": None,  # top result, passed into suggest_outfit
+        "wardrobe": wardrobe,  # user's wardrobe dict
+        "outfit_suggestion": None,  # string returned by suggest_outfit
+        "fit_card": None,  # string returned by create_fit_card
+        "error": None,  # set if the interaction ended early
     }
 
 
 # ── planning loop ─────────────────────────────────────────────────────────────
+
 
 def run_agent(query: str, wardrobe: dict) -> dict:
     """
@@ -129,15 +131,15 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 print(f"{key}: {value}")
         return
 
-
+    # Step 1: initialize session
     session = _new_session(query, wardrobe)
+    print_session_state(session, "step 1: initialize session")  # debug print
 
     # Step 2: parse query
     session["parsed"] = _parse_query(query)
     parsed = session["parsed"]
 
-    print_session_state(session, "step 2: parsing query")  # debug print
-    
+    print_session_state(session, "step 2: parse query")  # debug print
 
     # Step 3: search listings
     session["search_results"] = search_listings(
@@ -146,10 +148,12 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         max_price=parsed.get("max_price"),
     )
     if not session["search_results"]:
-        session["error"] = "No listings found matching your search. Try a different description, size, or price."
+        session["error"] = (
+            "No listings found matching your search. Try a different description, size, or price."
+        )
         print_session_state(session, "step 3: search listing")  # debug print
         return session
-    
+
     print_session_state(session, "step 3: search listing")  # debug print
 
     # Step 4: select top result
@@ -160,7 +164,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # Step 5: suggest outfit
     outfit = suggest_outfit(session["selected_item"], session["wardrobe"])
     if outfit.startswith("Error message:"):
-        session["error"] = outfit
+        session["error"] = outfit.removeprefix("Error message:").strip()
         print_session_state(session, "step 5: suggest outfit")  # debug print
         return session
     session["outfit_suggestion"] = outfit
@@ -170,7 +174,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # Step 6: create fit card
     fit_card = create_fit_card(session["outfit_suggestion"], session["selected_item"])
     if fit_card.startswith("Error message:"):
-        session["error"] = fit_card
+        session["error"] = fit_card.removeprefix("Error message:").strip()
         print_session_state(session, "step 6: create_fit_card")  # debug print
         return session
     session["fit_card"] = fit_card

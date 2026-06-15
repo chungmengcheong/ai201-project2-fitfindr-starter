@@ -48,6 +48,9 @@ Returns a set of matching listing dicts, sorted by keyword relevance (best match
 <!-- What should the agent do if no listings match? -->
 Returns a empty list. This is trap and checked for in the planning loop, when then sets session["error"] to "No listings found matching your search. Try a different description, size, or price."
 
+Concrete example:
+- Search: "designer ballgown size XXS under $5"
+- User message: "No listings found matching your search. Try a different description, size, or price."
 
 ---
 
@@ -69,7 +72,20 @@ Suggests 1 complete outfit when provided an item and wardrobe.
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if the wardrobe is empty or no outfit can be suggested? -->
 - if `wardrobe[“items”]` is empty: the LLM is still called for general styling advice, but the method prepends the hardcoded prefix `”Error message: You don't have items in your wardrobe yet!\n\n”` before returning. The planning loop detects this prefix and surfaces it as an error, stopping the flow.
-  
+
+Concrete example:
+- Searched with new user (empty wardrobe)
+- User message: "You don't have items in your wardrobe yet! 
+
+Oh my gosh, I'm obsessed with this tee. Okay, so since it's a crop top, you'll want to balance it out with some high-waisted bottoms. Here are a few outfit ideas to get you started:
+
+First, you could go for a super cute, laid-back vibe by pairing it with some high-waisted mom jeans and sneakers. The fitted crop length will look adorable with the high-waisted jeans, and you can add some comfy sneakers to keep the outfit casual.
+
+Another idea is to dress it up a bit with a flowy skirt. A flowy, pastel-colored skirt would be perfect for a cottagecore-inspired look. Just pair the tee with the skirt and add some sandals or ankle boots, and you're good to go.
+
+Lastly, if you want to really lean into the Y2K vibe, you could pair it with some low-rise shorts and a pair of chunky sneakers. This would be such a fun, nostalgic look for a summer day or a music festival. Just add some layered necklaces or a choker to complete the look.
+
+Overall, this tee is so versatile, and I think it would look great with a lot of different pieces. Just remember to balance out the crop length with some high-waisted bottoms, and you'll be golden!"
 
 ---
 
@@ -91,7 +107,7 @@ Creates a catchy social media caption describing a provided outfit.
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if the outfit data is incomplete? -->
 The method code (not the LLM) checks whether `outfit` is empty or whitespace before calling the LLM and returns this hardcoded string directly:
-- if `outfit` is empty or whitespace: `”Error message: No outfit suggestion provided. Ask user to try again.”`
+- if `outfit` is empty or whitespace: `”No outfit suggestion provided. Ask user to try again.”`
 
 ---
 
@@ -106,11 +122,11 @@ The method code (not the LLM) checks whether `outfit` is empty or whitespace bef
 **How does your agent decide which tool to call next?**
 <!-- Describe the logic your planning loop uses. What does it look at? What conditions change its behavior? How does it know when it's done? -->
 
-###Logic:
+### Approach: 
 
 A sequential flow calls the tools in order : search_listing -> suggest_outfit -> create_fit_card. Wrapped around each tool call is if-else logic to handle results from the tool and manage state.  
 
-###Pseudocode - Planning Loop:
+### Pseudocode - Planning Loop:
 
 ```
 initialize session with _new_session()
@@ -151,7 +167,7 @@ else
 return session
 ```
 
-###LLM prompt to parse user query
+### LLM prompt to parse user query
 ```
 Extract the exact description keywords, size, and max price from the user query {session["query"]}
 The result should be a string that can be loaded as a python dictionary with json.loads():
@@ -161,7 +177,7 @@ The result should be a string that can be loaded as a python dictionary with jso
     }
 If a field is not in the query, set it to 'null'. 
 
-##Examples:
+## Examples:
 "vintage graphic tee under $30" returns {"description": "vintage graphic tee", "size": null, "max_price": 30} 
 "black combat boots size 8" returns {"description": "black combat boots", "size": "8", "max_price": null}
 "designer ballgown size XXS under $5" returns {"description": "designer ballgown", "size": "XXS", "max_price": 5}
@@ -174,9 +190,17 @@ If a field is not in the query, set it to 'null'.
 **How does information from one tool get passed to the next?**
 <!-- Describe how your agent stores and accesses state within a session. What data is tracked? How is it passed between tool calls? -->
 
-Session state is maintained by the harness run_agent(), which stores state in a 'session' variable (dict). 
+Session state is maintained by the harness run_agent(), which stores state in a 'session' variable (dict). The appropriate arguments are extracted from 'session' and passed into the tool calls, and the results from the tool calls are saved into 'session'.
 
-The appropriate arguments are extracted from 'session' and passed into the tool calls, and the results from the tool calls are saved into 'session'.   
+Specifically the attributes are:
+- query (str): user query, e.g., "vintage graphic tee under $30"
+- parsed (dict): extracted attributes from user query, e.g., {'description': 'vintage graphic tee', 'size': None, 'max_price': 30.0}
+- search_results (list): list of items (dict)
+- selected_item (dict): the top search result, if any
+- wardrobe (dict): see wardrobe schema 
+- outfit_suggestion (str): suggested outfit from the agent 
+- fit_card (str): suggested caption from the agent
+- error (str): error message for the agent harness and UI to process
 
 
 ---
@@ -262,7 +286,7 @@ I’ll use Claude Code to help me implement the code.
 
 I’ll work through each tool in sequence -- going in the order of search_listings >  suggest_outfit > create_fit_card. 
 
-For each tool, I’ll prompt the AI with the specific section for the tool and architecture flow in planning.md. 
+For each tool, I’ll prompt the AI with the specific sub-section for the tool (from above), architecture flow, and state management sections in planning.md. 
 
 I'll sanity-check the generated code that it:
 - search_listings: filters by all parameters and handles empty-results case
@@ -609,3 +633,62 @@ Outfit idea
 
 Your fit card
     Just threw on my new fave Y2K Baby Tee that I scored for $18.00 on Depop and I'm feeling like a total 90s kid - paired it with some comfy baggy jeans and chunky white sneakers for a laid-back, retro vibe that's perfect for a chill day out. The butterfly print is literally everything and I'm obsessed with how it adds a touch of whimsy to my overall look.
+```
+
+## AI Usage
+
+<!-- Describe at least 2 specific instances where you used an AI tool during this project.
+     For each: what did you give the AI as input, what did it produce, and what did you
+     change, override, or direct differently?
+-->
+
+**Instance 1**
+
+- *What I gave the AI:* 
+
+I was not familiar with Pytest, so I used Claude to help me create test cases for the failure mode: 
+
+```
+"i need you to help me create pytests (./tests/test_tools.py). there should be one test per failure mode.?"
+```
+
+- *What it produced:* 
+
+It a set of tests cases. I read through it, and asking Claude to explain sections, to help me understand how it works. 
+
+- *What I changed or overrode:* 
+
+I experimented with the test parameters to help me undestand pytest and the generated code. In the future, I think I would write the test cases first before implmentation. 
+
+
+**Instance 2**
+
+- *What I gave the AI:* 
+
+```
+"Implement search_listing(). Please review the requirements in planning.md, specifically the sections on 'Tool 1: search_listings()', 'Architecture', and 'State Management' section. Please ask me any clarification questions before implementation."
+```
+
+Note, planning.md was reasonably specified so that Claude was given guidance and context on what to implement. 
+
+- *What it produced:* 
+
+It implemented searchi_listing in one-shot. It also ran through some basic verification of its code (happy path and null result paths). 
+
+- *What I changed or overrode:* 
+
+I inspected the code and accepted it as produced. The detailed spec got it to where I wanted in one-shot. 
+
+## Spec reflection
+
+### How spec helped
+
+I found the spec helpful in (forcing!) thinking through the user flow and how to handle the different states and inputs (e.g., happy path, no wardrobe, etc). 
+
+However, I think the degree of detail in the documentation seems unnatural. I would imagine progressive discovery - we learn more as we work the problem, and some element of co-exploring with Claude. In forcing a detailed spec upfront, the discovery steps were missing. I felt this was a very waterfall approach to development. 
+
+
+### How diverged
+
+I had to adjust how refine how error state was passed from the tool to and managed by the planning loop. The interface for the tools, as given, had different patterns for communicating errors and edge cases, e.g, the search_listing() returned null results as opposed to generating an error message. This required me to refactor code, planning.md, and architecture continously, which was a error-prone experience.  
+
