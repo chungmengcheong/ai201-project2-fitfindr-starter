@@ -2,7 +2,7 @@
 from unittest.mock import MagicMock, patch
 
 from tools import search_listings, suggest_outfit, create_fit_card
-from utils.data_loader import get_empty_wardrobe
+from utils.data_loader import get_empty_wardrobe, get_example_wardrobe
 
 
 # ── shared fixture ────────────────────────────────────────────────────────────
@@ -43,6 +43,23 @@ def test_search_no_results():
 
 # ── suggest_outfit ────────────────────────────────────────────────────────────
 
+def test_suggest_outfit_with_wardrobe():
+    """Happy path: non-empty wardrobe — returns outfit suggestion, no error prefix."""
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Pair the tee with baggy jeans and chunky sneakers."
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("tools._get_groq_client", return_value=mock_client):
+        result = suggest_outfit(SAMPLE_ITEM, get_example_wardrobe())
+
+    assert isinstance(result, str)
+    assert len(result) > 0
+    assert not result.startswith("Error message:")
+    mock_client.chat.completions.create.assert_called_once()
+
+
 def test_suggest_outfit_empty_wardrobe():
     """Failure mode: empty wardrobe — LLM is still called for general advice,
     but result is prefixed with 'Error message:' so the agent surfaces it as an error."""
@@ -61,6 +78,23 @@ def test_suggest_outfit_empty_wardrobe():
 
 
 # ── create_fit_card ───────────────────────────────────────────────────────────
+
+def test_create_fit_card_with_outfit():
+    """Happy path: valid outfit string — returns caption, no error prefix."""
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Scored this Y2K tee for $18 on Depop and I'm obsessed."
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("tools._get_groq_client", return_value=mock_client):
+        result = create_fit_card("Pair with baggy jeans and chunky sneakers.", SAMPLE_ITEM)
+
+    assert isinstance(result, str)
+    assert len(result) > 0
+    assert not result.startswith("Error message:")
+    mock_client.chat.completions.create.assert_called_once()
+
 
 def test_create_fit_card_empty_outfit():
     """Failure mode: outfit string is empty — returns hardcoded error string, no LLM call."""
