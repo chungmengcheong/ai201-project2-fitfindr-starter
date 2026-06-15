@@ -116,11 +116,28 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
+
+    def print_session_state(session, step):
+        """Helper function to print the current session state at each step for debugging."""
+        print(f"\n=== After {step} ===")
+        for key, value in session.items():
+            if key == "search_results":
+                print(f"{key} (count): {len(value)}")
+            elif key == "wardrobe":
+                print(f"{key} (item count): {len(session["wardrobe"]["items"])}")
+            else:
+                print(f"{key}: {value}")
+        return
+
+
     session = _new_session(query, wardrobe)
 
     # Step 2: parse query
     session["parsed"] = _parse_query(query)
     parsed = session["parsed"]
+
+    print_session_state(session, "step 2: parsing query")  # debug print
+    
 
     # Step 3: search listings
     session["search_results"] = search_listings(
@@ -130,24 +147,35 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     )
     if not session["search_results"]:
         session["error"] = "No listings found matching your search. Try a different description, size, or price."
+        print_session_state(session, "step 3: search listing")  # debug print
         return session
+    
+    print_session_state(session, "step 3: search listing")  # debug print
 
     # Step 4: select top result
     session["selected_item"] = session["search_results"][0]
+
+    print_session_state(session, "step 4: select top result")  # debug print
 
     # Step 5: suggest outfit
     outfit = suggest_outfit(session["selected_item"], session["wardrobe"])
     if outfit.startswith("Error message:"):
         session["error"] = outfit
+        print_session_state(session, "step 5: suggest outfit")  # debug print
         return session
     session["outfit_suggestion"] = outfit
+
+    print_session_state(session, "step 5: suggest outft")  # debug print
 
     # Step 6: create fit card
     fit_card = create_fit_card(session["outfit_suggestion"], session["selected_item"])
     if fit_card.startswith("Error message:"):
         session["error"] = fit_card
+        print_session_state(session, "step 6: create_fit_card")  # debug print
         return session
     session["fit_card"] = fit_card
+
+    print_session_state(session, "step 6: create_fit_card")  # debug print
 
     return session
 

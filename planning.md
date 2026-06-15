@@ -46,7 +46,7 @@ Returns a set of matching listing dicts, sorted by keyword relevance (best match
 
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if no listings match? -->
-Returns None
+Returns a empty list. This is trap and checked for in the planning loop, when then sets session["error"] to "No listings found matching your search. Try a different description, size, or price."
 
 
 ---
@@ -68,7 +68,7 @@ Suggests 1 complete outfit when provided an item and wardrobe.
 
 **What happens if it fails or returns nothing:**
 <!-- What should the agent do if the wardrobe is empty or no outfit can be suggested? -->
-- if `wardrobe[“items”]` is empty: call the LLM for general styling advice (what types of items pair well, what vibe it suits). Does not return an error — the flow continues to create_fit_card.
+- if `wardrobe[“items”]` is empty: the LLM is still called for general styling advice, but the method prepends the hardcoded prefix `”Error message: You don't have items in your wardrobe yet!\n\n”` before returning. The planning loop detects this prefix and surfaces it as an error, stopping the flow.
   
 
 ---
@@ -188,7 +188,7 @@ For each tool, describe the specific failure mode you're handling and what the a
 | Tool | Failure mode | Agent response |
 |------|-------------|----------------|
 | search_listings | No results match the query | Agent given response “There are no matching listings from the loaded listings. Prompt user to try a different search query.” |
-| suggest_outfit | Wardrobe is empty | Call LLM for general styling advice — not an error, flow continues normally. |
+| suggest_outfit | Wardrobe is empty | LLM is called for general styling advice, but result is prefixed with `"Error message:"` — planning loop stops the flow. |
 | create_fit_card | Outfit input is missing or incomplete | Agent given response "Inform user that provided items does not make up a complete outfit. Mentioned what items are missing, e.g., 'missing a top'. Ask user to try again.” |
 
 ---
@@ -569,13 +569,17 @@ suggest_outfit(session["selected_item"], wardrobe)
 
 returns: 
 ```
-"Pair your vintage graphic tee with your baggy straight-leg jeans, dark wash and chunky white sneakers"
+"    You should totally pair the Y2K Baby Tee with the Baggy straight-leg jeans and the Chunky white sneakers for a laid-back, retro-inspired look that's perfect for a casual day out. 
+
+    Alternatively, you could also style the Y2K Baby Tee with the Wide-leg khaki trousers and the Black combat boots for a cool, eclectic vibe that blends vintage and modern elements in a really fresh way."
 ```
 
 **Step 3:**
 <!-- Continue until the full interaction is complete -->
 ```
-session["outfit_suggestion"] = "Wear your vintage graphic tee with your baggy straight-leg jeans, dark wash and chunky white sneakers"
+session["outfit_suggestion"] = "You should totally pair the Y2K Baby Tee with the Baggy straight-leg jeans and the Chunky white sneakers for a laid-back, retro-inspired look that's perfect for a casual day out. 
+
+    Alternatively, you could also style the Y2K Baby Tee with the Wide-leg khaki trousers and the Black combat boots for a cool, eclectic vibe that blends vintage and modern elements in a really fresh way."
 ```
 
 ```
@@ -583,7 +587,7 @@ create_fit_card(session["outfit_suggestion"], session["selected_item"]]
 ```
 returns
 ```
-"When you need to channel the early Millenium energy"
+"Just threw on my new fave Y2K Baby Tee that I scored for $18.00 on Depop and I'm feeling like a total 90s kid - paired it with some comfy baggy jeans and chunky white sneakers for a laid-back, retro vibe that's perfect for a chill day out. The butterfly print is literally everything and I'm obsessed with how it adds a touch of whimsy to my overall look."
 ```
 
 
@@ -599,7 +603,9 @@ Top listing found
     Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.
 
 Outfit idea
-    Wear your vintage graphic tee with your baggy straight-leg jeans, dark wash and chunky white sneakers
+    You should totally pair the Y2K Baby Tee with the Baggy straight-leg jeans and the Chunky white sneakers for a laid-back, retro-inspired look that's perfect for a casual day out. 
+
+    Alternatively, you could also style the Y2K Baby Tee with the Wide-leg khaki trousers and the Black combat boots for a cool, eclectic vibe that blends vintage and modern elements in a really fresh way.
 
 Your fit card
-    When you need to channel the early Millenium energy
+    Just threw on my new fave Y2K Baby Tee that I scored for $18.00 on Depop and I'm feeling like a total 90s kid - paired it with some comfy baggy jeans and chunky white sneakers for a laid-back, retro vibe that's perfect for a chill day out. The butterfly print is literally everything and I'm obsessed with how it adds a touch of whimsy to my overall look.

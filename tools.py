@@ -13,28 +13,27 @@ Tools:
 """
 
 import os
+import config
 
 from dotenv import load_dotenv
 from groq import Groq
 
 from utils.data_loader import load_listings
 
-load_dotenv()
-
-
 # ── Groq client ───────────────────────────────────────────────────────────────
+
 
 def _get_groq_client():
     """Initialize and return a Groq client using GROQ_API_KEY from .env."""
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
+    if not config.GROQ_API_KEY:
         raise ValueError(
             "GROQ_API_KEY not set. Add it to a .env file in the project root."
         )
-    return Groq(api_key=api_key)
+    return Groq(api_key=config.GROQ_API_KEY)
 
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
+
 
 def search_listings(
     description: str,
@@ -80,14 +79,16 @@ def search_listings(
 
     scored = []
     for listing in listings:
-        searchable = " ".join([
-            listing["title"],
-            listing["description"],
-            listing["category"],
-            " ".join(listing["style_tags"]),
-            " ".join(listing["colors"]),
-            listing["brand"] or "",
-        ]).lower()
+        searchable = " ".join(
+            [
+                listing["title"],
+                listing["description"],
+                listing["category"],
+                " ".join(listing["style_tags"]),
+                " ".join(listing["colors"]),
+                listing["brand"] or "",
+            ]
+        ).lower()
         score = sum(1 for kw in keywords if kw in searchable)
         if score > 0:
             scored.append((score, listing))
@@ -97,6 +98,7 @@ def search_listings(
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
+
 
 def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     """
@@ -133,16 +135,10 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
         f"Description: {new_item['description']}"
     )
 
-    if not wardrobe["items"]:
-        prompt = (
-            f"A user is considering buying this thrifted item:\n{item_summary}\n\n"
-            "They haven't added any wardrobe items yet. Suggest 2-3 general outfit ideas for this piece: "
-            "what kinds of items pair well with it, what vibe it suits, and specific types of pieces to look for. "
-            "Keep it casual and specific, like advice from a stylish friend."
-        )
-    else:
+    if wardrobe["items"]:
         wardrobe_lines = "\n".join(
             f"- {item['name']} ({item['category']}, {', '.join(item['colors'])})"
+            + (f" — {item['style_tags']}" if item.get("style_tags") else "")
             + (f" — {item['notes']}" if item.get("notes") else "")
             for item in wardrobe["items"]
         )
@@ -153,16 +149,31 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
             "from their wardrobe. Name the wardrobe pieces by name. Describe the vibe of each outfit "
             "in one sentence. Keep it casual, specific, and like advice from a stylish friend."
         )
+        isWardrobeEmpty = False
+    else:  # no wardrobe items, give general advice
+        prompt = (
+            f"A user is considering buying this thrifted item:\n{item_summary}\n\n"
+            "They haven't added any wardrobe items yet. Suggest 2-3 general outfit ideas for this piece: "
+            "what kinds of items pair well with it, what vibe it suits, and specific types of pieces to look for. "
+            "Keep it casual and specific, like advice from a stylish friend."
+        )
+        isWardrobeEmpty = True
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
     )
-    return response.choices[0].message.content
+
+    response_text = response.choices[0].message.content
+    if isWardrobeEmpty:
+        response_text = "Error message: You don't have items in your wardrobe yet! \n\n" + (response_text or "")
+
+    return response_text
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
+
 
 def create_fit_card(outfit: str, new_item: dict) -> str:
     """
@@ -192,7 +203,7 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     Before writing code, fill in the Tool 3 section of planning.md.
     """
     if not outfit or not outfit.strip():
-        return "Error message: No outfit suggestion provided. Ask user to try again."
+        return "Error message: No outfit suggestion provided. Please try again."
 
     client = _get_groq_client()
 
@@ -209,8 +220,8 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     )
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=config.LLM_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        temperature=1.0,
+        temperature=config.TEMPERATURE_FIT_CARD,
     )
     return response.choices[0].message.content
